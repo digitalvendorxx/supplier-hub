@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Supplier Hub — Kayıt</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body class="login-body">
+<div class="login-card">
+  <h1>Kayıt ol</h1>
+  <p class="sub">Yeni hesap oluştur</p>
+  <form id="signupForm">
+    <label>Hesap türü</label>
+    <select id="role">
+      <option value="store_owner">Mağaza Sahibi (Etsy satıcısı)</option>
+      <option value="supplier">Tedarikçi (üretim/baskı yapan)</option>
+    </select>
+    <label>Ad</label>
+    <input id="name" autocomplete="name" />
+    <label>E-posta</label>
+    <input type="email" id="email" required autocomplete="email" />
+    <label>Şifre (en az 6 karakter)</label>
+    <input type="password" id="password" required minlength="6" autocomplete="new-password" />
+    <label>Şifre (tekrar)</label>
+    <input type="password" id="password2" required minlength="6" autocomplete="new-password" />
+    <button type="submit">Kayıt ol</button>
+    <div id="err" class="err"></div>
+  </form>
+  <div class="login-foot">
+    Zaten hesabın var mı? <a href="/login.html">Giriş yap</a>
+  </div>
+</div>
+<script>
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('err');
+  err.textContent = '';
+  const pw = document.getElementById('password').value;
+  const pw2 = document.getElementById('password2').value;
+  if (pw !== pw2) { err.textContent = 'Şifreler eşleşmiyor'; return; }
+  const r = await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: document.getElementById('email').value,
+      name: document.getElementById('name').value,
+      password: pw,
+      role: document.getElementById('role').value,
+    }),
+  });
+  const data = await r.json();
+  if (!r.ok) { err.textContent = data.error || 'Kayıt başarısız'; return; }
+  location.href = '/';
+});
+
+fetch('/api/auth/me').then(r => { if (r.ok) location.href = '/'; });
+</script>
+</body>
+</html>

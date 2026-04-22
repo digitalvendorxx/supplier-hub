@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Supplier Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">SH</div>
+      <div>
+        <h1>Supplier Hub</h1>
+        <small id="brandSub">—</small>
+      </div>
+    </div>
+    <input type="search" class="sidebar-search" id="sidebarSearch" placeholder="Sipariş, ürün, müşteri..." />
+    <nav id="sidebarNav"></nav>
+  </aside>
+
+  <div>
+    <div class="top-bar">
+      <div class="left">
+        <div class="page-title" id="pageTitle">—</div>
+      </div>
+      <div class="right">
+        <div class="chip wallet" id="walletChip" hidden>
+          <span>Cüzdanım</span>
+          <span class="num" id="walletNum">—</span>
+        </div>
+        <div class="user">
+          <div class="avatar" id="userAvatar">?</div>
+          <div>
+            <div style="font-size:13px;font-weight:500" id="userName">—</div>
+            <div style="font-size:11px;color:var(--muted)" id="userRole">—</div>
+          </div>
+          <button id="logoutBtn">Çıkış</button>
+        </div>
+      </div>
+    </div>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div id="drawerHost"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

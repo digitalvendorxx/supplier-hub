@@ -1,0 +1,19 @@
+{
+  "name": "supplier-hub",
+  "version": "0.1.0",
+  "description": "Central order aggregation hub for multi-store Etsy supplier",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node scripts/seed-mock.js",
+    "seed:users": "node scripts/seed-users.js",
+    "seed:catalog": "node scripts/seed-catalog.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-session": "^1.19.0"
+  }
+}
