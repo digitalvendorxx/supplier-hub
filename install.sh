@@ -53,6 +53,20 @@ install_git_linux()  {
   fi
 }
 
+install_npm_only() {
+  # Node var ama npm yok (Debian/Ubuntu eski paket bolunmeleri)
+  case "$OS" in
+    Darwin) install_brew; brew install npm 2>/dev/null || brew reinstall node@22 ;;
+    Linux)
+      if need apt-get; then sudo apt-get update && sudo apt-get install -y npm
+      elif need dnf;     then sudo dnf install -y npm
+      elif need pacman;  then sudo pacman -Sy --noconfirm npm
+      else die "npm paketi bulunamadi. Node'u komple kaldirip yeniden kur: https://nodejs.org/"
+      fi ;;
+  esac
+  refresh_path
+}
+
 # 1. Git
 if ! need git; then
   case "$OS" in
@@ -82,7 +96,11 @@ if [ "$install_node" = "1" ]; then
   refresh_path
 fi
 need node || die "Node kuruldu ama PATH'te yok. Terminali yeniden ac."
-need npm  || die "npm bulunamadi (Node kurulumu eksik). Yeniden kur: https://nodejs.org/"
+if ! need npm; then
+  echo ">> npm eksik, kuruluyor..."
+  install_npm_only
+fi
+need npm || die "npm kurulamadi. Elle kur: https://nodejs.org/"
 echo "   Node: $(node -v)"
 echo "   npm:  $(npm -v)"
 

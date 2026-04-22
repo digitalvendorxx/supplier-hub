@@ -87,7 +87,13 @@ if ($needNode) {
 }
 if (-not $NodeExe) { throw "Node kuruldu ama bulunamadi. Terminali kapatip yeniden ac." }
 $NpmCmd = Resolve-Exe @('npm.cmd','npm')
-if (-not $NpmCmd) { throw "npm bulunamadi. Node kurulumu bozuk olabilir." }
+if (-not $NpmCmd) {
+  Say "npm eksik, Node LTS yeniden kuruluyor..."
+  winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-package-agreements --accept-source-agreements --force | Out-Null
+  Refresh-Path
+  $NpmCmd = Resolve-Exe @('npm.cmd','npm')
+}
+if (-not $NpmCmd) { throw "npm kurulamadi. Elle kur: https://nodejs.org/" }
 Ok "Node: $(& $NodeExe -v)"
 Ok "npm:  $(& $NpmCmd -v)"
 
