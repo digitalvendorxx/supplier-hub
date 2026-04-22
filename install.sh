@@ -96,6 +96,40 @@ npm run seed:users   || true
 npm run seed:catalog || true
 npm run seed         || true
 
+PORT=3100
+URL="http://localhost:$PORT"
+
+# Onceki instance varsa oldur
+if need lsof; then
+  OLD_PID=$(lsof -ti tcp:$PORT 2>/dev/null || true)
+  [ -n "$OLD_PID" ] && kill -9 $OLD_PID 2>/dev/null || true
+fi
+
+echo ">> Server baslatiliyor (detached)..."
+nohup node server.js > "$TARGET_DIR/server.log" 2>&1 &
+SERVER_PID=$!
+disown $SERVER_PID 2>/dev/null || true
+echo $SERVER_PID > "$TARGET_DIR/server.pid"
+
+# Port bind bekle (max 15 sn)
+READY=0
+for i in $(seq 1 30); do
+  sleep 0.5
+  if (echo > /dev/tcp/127.0.0.1/$PORT) >/dev/null 2>&1; then
+    READY=1; break
+  fi
+done
+
+if [ "$READY" = "1" ]; then
+  echo "   Server ayakta (PID $SERVER_PID) -> $URL"
+  case "$OS" in
+    Darwin) open "$URL" 2>/dev/null || true ;;
+    Linux)  (need xdg-open && xdg-open "$URL" >/dev/null 2>&1) || true ;;
+  esac
+else
+  echo "   UYARI: Server ayaga kalkmadi. Log: $TARGET_DIR/server.log"
+fi
+
 cat <<EOF
 
 Kurulum tamam.
@@ -107,10 +141,11 @@ Test kullanicilari:
   owner@hub.local    / owner123
   supplier@hub.local / supplier123
 
-Baslat:
-  cd "$TARGET_DIR"
-  npm start
-  -> http://localhost:3100
+URL: $URL
+
+Durdurmak icin:  kill \$(cat "$TARGET_DIR/server.pid")
+Tekrar baslat:   cd "$TARGET_DIR" && npm start
+Log:             tail -f "$TARGET_DIR/server.log"
 
 Gercek Easyship: .env -> DATA_SOURCE=easyship + EASYSHIP_API_TOKEN
 EOF

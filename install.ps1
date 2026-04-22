@@ -98,9 +98,42 @@ Write-Host "  admin\@hub.local    / admin123"
 Write-Host "  owner\@hub.local    / owner123"
 Write-Host "  supplier\@hub.local / supplier123"
 Write-Host ""
-Write-Host "Baslat:"
-Write-Host "  cd `"$TargetDir`""
-Write-Host "  npm start"
-Write-Host "  -> http://localhost:3100"
+
+# 8. Auto-start server (detached) + open browser
+$port   = 3100
+$logOut = Join-Path $TargetDir 'server.log'
+$logErr = Join-Path $TargetDir 'server.err.log'
+
+# Onceki instance varsa oldur
+Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+  ForEach-Object { try { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } catch {} }
+
+Say "Server baslatiliyor (detached)..."
+$proc = Start-Process -FilePath "node" -ArgumentList "server.js" `
+  -WorkingDirectory $TargetDir `
+  -RedirectStandardOutput $logOut `
+  -RedirectStandardError  $logErr `
+  -WindowStyle Hidden -PassThru
+
+# Port bind bekle (max 15 sn)
+$url = "http://localhost:$port"
+$ready = $false
+for ($i = 0; $i -lt 30; $i++) {
+  Start-Sleep -Milliseconds 500
+  if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
+    $ready = $true; break
+  }
+}
+
+if ($ready) {
+  Ok "Server ayakta (PID $($proc.Id)) -> $url"
+  Start-Process $url
+} else {
+  Warn "Server ayaga kalkmadi. Log: $logErr"
+}
+
+Write-Host ""
+Write-Host "Durdurmak icin: Stop-Process -Id $($proc.Id)"
+Write-Host "Tekrar baslat:  cd `"$TargetDir`"; npm start"
 Write-Host ""
 Write-Host "Gercek Easyship: .env -> DATA_SOURCE=easyship + EASYSHIP_API_TOKEN"
