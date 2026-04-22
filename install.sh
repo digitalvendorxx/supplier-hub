@@ -14,21 +14,44 @@ OS="$(uname -s)"
 need() { command -v "$1" >/dev/null 2>&1; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
+refresh_path() {
+  # brew shellenv (mac), nodesource bin (linux) PATH'e ekle
+  [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+  [ -x /usr/local/bin/brew ]    && eval "$(/usr/local/bin/brew shellenv)"
+  case ":$PATH:" in *":/usr/local/bin:"*) ;; *) export PATH="/usr/local/bin:$PATH" ;; esac
+  case ":$PATH:" in *":/usr/bin:"*)       ;; *) export PATH="/usr/bin:$PATH" ;; esac
+}
+
 install_brew() {
   if ! need brew; then
     echo ">> Homebrew kuruluyor..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    [ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
-    [ -x /usr/local/bin/brew ]    && eval "$(/usr/local/bin/brew shellenv)"
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    refresh_path
   fi
 }
-install_node_mac()   { install_brew; brew install node@22 && brew link --overwrite --force node@22; }
+install_node_mac()   { install_brew; brew install node@22 && brew link --overwrite --force node@22; refresh_path; }
 install_node_linux() {
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-  sudo apt-get install -y nodejs
+  if need apt-get; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+  elif need dnf; then
+    curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo -E bash -
+    sudo dnf install -y nodejs
+  elif need pacman; then
+    sudo pacman -Sy --noconfirm nodejs npm
+  else
+    die "Paket yoneticisi bulunamadi (apt/dnf/pacman). Node 22+ elle kur: https://nodejs.org/"
+  fi
+  refresh_path
 }
-install_git_mac()    { install_brew; brew install git; }
-install_git_linux()  { sudo apt-get update && sudo apt-get install -y git; }
+install_git_mac()    { install_brew; brew install git; refresh_path; }
+install_git_linux()  {
+  if need apt-get; then sudo apt-get update && sudo apt-get install -y git
+  elif need dnf;     then sudo dnf install -y git
+  elif need pacman;  then sudo pacman -Sy --noconfirm git
+  else die "git elle kur"
+  fi
+}
 
 # 1. Git
 if ! need git; then
@@ -37,7 +60,9 @@ if ! need git; then
     Linux)  install_git_linux ;;
     *) die "Git yok, elle kur: https://git-scm.com" ;;
   esac
+  refresh_path
 fi
+need git || die "Git kuruldu ama PATH'te yok. Terminali yeniden ac."
 echo "   Git: $(git --version)"
 
 # 2. Node 22+ (node:sqlite gerekli)
@@ -54,8 +79,12 @@ if [ "$install_node" = "1" ]; then
     Linux)  install_node_linux ;;
     *) die "Bilinmeyen OS, Node 22+ elle kur" ;;
   esac
+  refresh_path
 fi
+need node || die "Node kuruldu ama PATH'te yok. Terminali yeniden ac."
+need npm  || die "npm bulunamadi (Node kurulumu eksik). Yeniden kur: https://nodejs.org/"
 echo "   Node: $(node -v)"
+echo "   npm:  $(npm -v)"
 
 # 3. Clone / pull
 if [ -d "$TARGET_DIR/.git" ]; then

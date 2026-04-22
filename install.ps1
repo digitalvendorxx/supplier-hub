@@ -18,9 +18,43 @@ function Need($c){ $null -ne (Get-Command $c -ErrorAction SilentlyContinue) }
 function Refresh-Path {
   $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
               [System.Environment]::GetEnvironmentVariable("Path","User")
+  # Olasi Node dizinlerini manuel ekle (winget fresh kurulum PATH broadcast gecikmeli)
+  $extra = @(
+    (Join-Path $env:ProgramFiles       'nodejs'),
+    (Join-Path ${env:ProgramFiles(x86)} 'nodejs'),
+    (Join-Path $env:LOCALAPPDATA        'Programs\nodejs'),
+    (Join-Path $env:APPDATA             'npm'),
+    (Join-Path $env:ProgramFiles        'Git\cmd')
+  )
+  foreach ($p in $extra) {
+    if ($p -and (Test-Path $p) -and ($env:Path -notlike "*$p*")) {
+      $env:Path = "$p;$env:Path"
+    }
+  }
+}
+
+# Resolve helpers — PATH yoksa dosya sisteminden bul
+function Resolve-Exe($names) {
+  foreach ($n in $names) {
+    $c = Get-Command $n -ErrorAction SilentlyContinue
+    if ($c) { return $c.Source }
+  }
+  $candidates = @(
+    (Join-Path $env:ProgramFiles       'nodejs'),
+    (Join-Path ${env:ProgramFiles(x86)} 'nodejs'),
+    (Join-Path $env:LOCALAPPDATA        'Programs\nodejs')
+  )
+  foreach ($d in $candidates) {
+    foreach ($n in $names) {
+      $full = Join-Path $d $n
+      if (Test-Path $full) { return $full }
+    }
+  }
+  return $null
 }
 
 Write-Host "=== Supplier Hub - Windows installer ===" -ForegroundColor Magenta
+Refresh-Path
 
 # 1. winget
 if (-not (Need winget)) {
@@ -33,12 +67,15 @@ if (-not (Need git)) {
   winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements | Out-Null
   Refresh-Path
 }
-Ok "Git: $(git --version)"
+$GitExe = Resolve-Exe @('git.exe','git')
+if (-not $GitExe) { throw "Git kuruldu ama bulunamadi. Terminali kapatip yeniden ac." }
+Ok "Git: $(& $GitExe --version)"
 
 # 3. Node 22+ (node:sqlite icin)
 $needNode = $true
-if (Need node) {
-  $ver = (node -v) -replace '^v',''
+$NodeExe = Resolve-Exe @('node.exe','node')
+if ($NodeExe) {
+  $ver   = (& $NodeExe -v) -replace '^v',''
   $major = [int]($ver.Split('.')[0])
   if ($major -ge 22) { $needNode = $false }
 }
@@ -46,18 +83,23 @@ if ($needNode) {
   Say "Node 22 LTS kuruluyor (winget)..."
   winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-package-agreements --accept-source-agreements | Out-Null
   Refresh-Path
+  $NodeExe = Resolve-Exe @('node.exe','node')
 }
-Ok "Node: $(node -v)"
+if (-not $NodeExe) { throw "Node kuruldu ama bulunamadi. Terminali kapatip yeniden ac." }
+$NpmCmd = Resolve-Exe @('npm.cmd','npm')
+if (-not $NpmCmd) { throw "npm bulunamadi. Node kurulumu bozuk olabilir." }
+Ok "Node: $(& $NodeExe -v)"
+Ok "npm:  $(& $NpmCmd -v)"
 
 # 4. Clone / pull
 if (Test-Path (Join-Path $TargetDir '.git')) {
   Say "Repo mevcut, guncelleniyor: $TargetDir"
   Push-Location $TargetDir
-  git pull --ff-only
+  & $GitExe pull --ff-only
   Pop-Location
 } else {
   Say "Repo klonlaniyor: $TargetDir"
-  git clone $RepoUrl $TargetDir
+  & $GitExe clone $RepoUrl $TargetDir
 }
 
 Set-Location $TargetDir
@@ -65,7 +107,7 @@ Set-Location $TargetDir
 # 5. npm install
 if (-not (Test-Path (Join-Path $TargetDir 'node_modules'))) {
   Say "npm install..."
-  npm install
+  & $NpmCmd install
 }
 Ok "node_modules OK"
 
@@ -73,7 +115,7 @@ Ok "node_modules OK"
 $envPath = Join-Path $TargetDir '.env'
 if (-not (Test-Path $envPath)) {
   Copy-Item (Join-Path $TargetDir '.env.example') $envPath
-  $secret = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  $secret = & $NodeExe -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
   (Get-Content $envPath) -replace '^SESSION_SECRET=.*', "SESSION_SECRET=$secret" |
     Set-Content $envPath -Encoding UTF8
   Ok ".env olusturuldu (SESSION_SECRET otomatik)"
@@ -84,9 +126,9 @@ if (-not (Test-Path $envPath)) {
 # 7. Data dir + seed
 New-Item -ItemType Directory -Force -Path (Join-Path $TargetDir 'data') | Out-Null
 Say "seed: users + catalog + mock..."
-try { npm run seed:users }   catch { Warn "seed:users hata: $_" }
-try { npm run seed:catalog } catch { Warn "seed:catalog hata: $_" }
-try { npm run seed }         catch { Warn "seed hata: $_" }
+try { & $NpmCmd run seed:users }   catch { Warn "seed:users hata: $_" }
+try { & $NpmCmd run seed:catalog } catch { Warn "seed:catalog hata: $_" }
+try { & $NpmCmd run seed }         catch { Warn "seed hata: $_" }
 
 Write-Host ""
 Write-Host "Kurulum tamam." -ForegroundColor Green
@@ -109,7 +151,7 @@ Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinu
   ForEach-Object { try { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } catch {} }
 
 Say "Server baslatiliyor (detached)..."
-$proc = Start-Process -FilePath "node" -ArgumentList "server.js" `
+$proc = Start-Process -FilePath $NodeExe -ArgumentList "server.js" `
   -WorkingDirectory $TargetDir `
   -RedirectStandardOutput $logOut `
   -RedirectStandardError  $logErr `
